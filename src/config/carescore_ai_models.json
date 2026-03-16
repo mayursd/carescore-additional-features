@@ -1,0 +1,30 @@
+{
+  "gemini-3-pro-preview": {
+    "input_cost_per_1k_tokens": null,
+    "output_cost_per_1k_tokens": null
+  },
+  "gemini-3-flash-preview": {
+    "input_cost_per_1k_tokens": null,
+    "output_cost_per_1k_tokens": null
+  },
+  "gemini-2.5-pro": {
+    "input_cost_per_1k_tokens": null,
+    "output_cost_per_1k_tokens": null
+  },
+  "gemini-2.5-flash": {
+    "input_cost_per_1k_tokens": null,
+    "output_cost_per_1k_tokens": null
+  },
+  "gemini-2.0-flash": {
+    "input_cost_per_1k_tokens": null,
+    "output_cost_per_1k_tokens": null
+  },
+  "gemini-1.5-pro": {
+    "input_cost_per_1k_tokens": null,
+    "output_cost_per_1k_tokens": null
+  },
+  "gemini-1.5-flash": {
+    "input_cost_per_1k_tokens": null,
+    "output_cost_per_1k_tokens": null
+  }
+}

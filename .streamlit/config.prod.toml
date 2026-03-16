@@ -1,0 +1,8 @@
+# Production overrides
+[server]
+fileWatcherType = "none"
+headless = true
+runOnSave = false
+
+[logger]
+level = "info"

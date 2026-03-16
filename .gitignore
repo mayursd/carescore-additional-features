@@ -1,0 +1,15 @@
+env
+*.pdf
+*.mp4
+__pycache__
+soap_notes
+*.wav
+*.webm
+tests/*
+temp_files
+.env
+.pytest_cache
+*.zip
+lambda_package
+experiments/checklist.py
+experiments/test_output/extracted_checklist.json

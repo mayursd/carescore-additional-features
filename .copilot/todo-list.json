@@ -1,0 +1,17 @@
+[
+  {
+    "id": 1,
+    "title": "Add logging.basicConfig to audio_video_utils",
+    "status": "done"
+  },
+  {
+    "id": 2,
+    "title": "Add logging.basicConfig default setup in cleanup_recordings script",
+    "status": "done"
+  },
+  {
+    "id": 3,
+    "title": "Update .streamlit/config.toml logger settings",
+    "status": "done"
+  }
+]

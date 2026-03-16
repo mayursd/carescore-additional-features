@@ -1,0 +1,32 @@
+[
+  {
+    "username": "admin",
+    "password": "adminlof",
+    "role": "admin",
+    "id": "UADM001"
+  },
+  {
+    "username": "chandan@lofllc.com",
+    "password": "Ch@nd@n_62Qv!",
+    "role": "admin",
+    "id": "UADM002"
+  },
+  {
+    "username": "james.carlson@rosalindfranklin.edu",
+    "password": "JcRF!9v2#Lm$",
+    "role": "clinician",
+    "id": "UCLN001"
+  },
+  {
+    "username": "nikolina@lofllc.com",
+    "password": "N!k0l!n@_7Fs#",
+    "role": "clinician",
+    "id": "UCLN002"
+  },
+  {
+    "username": "simlab@rosalindfranklin.edu",
+    "password": "ambient$im2025",
+    "role": "student",
+    "id": "USTD001"
+  }
+]

@@ -1,0 +1,11 @@
+[server]
+fileWatcherType = "auto"  # Dev default; production uses config.prod.toml
+headless = true
+runOnSave = true
+
+[client]
+showErrorDetails = true
+
+[logger]
+level = "info"
+messageFormat = "%(asctime)s %(levelname)s %(message)s"

@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>LOF Cloud Audio Recorder</title>
+  <script src="https://unpkg.com/@daily-co/daily-js"></script>
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .card {
+      background: #fff;
+      padding: 30px 40px;
+      border-radius: 16px;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+      width: 100%;
+      max-width: 500px;
+      text-align: center;
+    }
+
+    h1 {
+      margin-bottom: 20px;
+      font-size: 24px;
+      color: #333;
+    }
+
+    #status {
+      margin-bottom: 20px;
+      font-size: 18px;
+      font-weight: 500;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      font-size: 16px;
+      margin: 10px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.3s ease;
+    }
+
+    .btn-start {
+      background-color: #4CAF50;
+      color: white;
+    }
+
+    .btn-start:hover {
+      background-color: #45a049;
+    }
+
+    .btn-stop {
+      background-color: #f44336;
+      color: white;
+    }
+
+    .btn-stop:hover {
+      background-color: #e53935;
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 12px;
+      margin-bottom: 15px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 14px;
+      box-sizing: border-box;
+    }
+
+    input[type="text"]:focus {
+      border-color: #4CAF50;
+      outline: none;
+      box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+    }
+
+    input[type="password"] {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 12px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    #recordingLink {
+      margin-top: 20px;
+      font-size: 16px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+  <h1>🎙️ Cloud Audio Recorder</h1>
+
+    <div id="status">Connecting to room...</div>
+    
+    <div id="recordingControls" style="display: none;">
+      <div id="roomInfo" style="margin-bottom: 15px; font-size: 14px; color: #666;"></div>
+      
+  <button id="startBtn" class="btn btn-start" disabled>Start Recording</button>
+  <button id="stopBtn" class="btn btn-stop" disabled>Stop Recording</button>
+      <div id="recordingLink"></div>
+    </div>
+  </div>
+
+  <script>
+    let call;
+    let localUserId;
+    let isRecording = false;
+    let currentRecordingId = null;
+    let generatedRoomName = null;
+    
+    // Get API key, room name, and timestamp from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    let API_KEY = urlParams.get('apikey') || urlParams.get('apiKey');
+    let PRESET_ROOM_NAME = urlParams.get('roomName') || '';
+    let RECORDING_TIMESTAMP = urlParams.get('timestamp') || '';
+
+    // Debug: Log the API key and URL params
+    console.log('Current URL:', window.location.href);
+    console.log('URL Search params:', window.location.search);
+    console.log('API_KEY from params:', API_KEY);
+    console.log('PRESET_ROOM_NAME from params:', PRESET_ROOM_NAME);
+    console.log('RECORDING_TIMESTAMP from params:', RECORDING_TIMESTAMP);
+    console.log('API_KEY length:', API_KEY ? API_KEY.length : 0);
+
+    // Wait for DOM to be fully loaded before accessing elements
+  let statusDiv, startBtn, stopBtn, recordingLinkDiv, recordingControls, roomInfo;
+    
+    document.addEventListener('DOMContentLoaded', function() {
+      statusDiv = document.getElementById("status");
+  startBtn = document.getElementById("startBtn");
+  stopBtn = document.getElementById("stopBtn");
+      recordingLinkDiv = document.getElementById("recordingLink");
+      recordingControls = document.getElementById("recordingControls");
+      roomInfo = document.getElementById("roomInfo");
+      
+      console.log('DOM elements loaded:', { statusDiv, startBtn, stopBtn, recordingLinkDiv, recordingControls, roomInfo });
+      
+      // Add event listeners after DOM elements are loaded
+      if (startBtn) {
+        startBtn.addEventListener("click", () => {
+          console.log('Start button clicked');
+          startRecording();
+        });
+      }
+      if (stopBtn) {
+        stopBtn.addEventListener("click", () => {
+          console.log('Stop button clicked');
+          stopRecording();
+        });
+      }
+    });
+
+    // Validate parameters and show appropriate messages
+    function validateAndShowStatus() {
+      if (!PRESET_ROOM_NAME) {
+        updateStatus("❌ Room name not provided in URL parameters.", true);
+        return false;
+      }
+
+      if (!API_KEY) {
+        updateStatus("❌ Recording service key not provided. Add ?apikey=YOUR_KEY to the URL.", true);
+        return false;
+      }
+
+      if (!RECORDING_TIMESTAMP) {
+        console.warn("⚠️ Timestamp not provided, using auto-generated timestamp");
+      }
+
+      return true;
+    }
+
+    function updateStatus(text, isError = false) {
+      if (statusDiv) {
+        statusDiv.innerText = text;
+        statusDiv.style.color = isError ? "red" : "#333";
+      } else {
+        console.log('Status update (DOM not ready):', text);
+      }
+    }
+
+    // Streamlit now passes fully composed room name (includes base, user id, timestamp)
+    function useProvidedRoomName(roomName) {
+      return (roomName || '').trim().toLowerCase();
+    }
+
+    async function createRoom(roomName) {
+      try {
+        console.log('Checking if room exists first:', roomName);
+        
+        // First, try to get the room to see if it exists
+        const checkRes = await fetch(`https://api.daily.co/v1/rooms/${roomName}`, {
+          method: "GET",
+          headers: {
+            "Authorization": `Bearer ${API_KEY}`,
+            "Content-Type": "application/json"
+          }
+        });
+        
+        if (checkRes.ok) {
+          // Room exists, use it
+          const existingRoom = await checkRes.json();
+          console.log('Room already exists, using existing room:', existingRoom);
+          return existingRoom.url;
+        }
+        
+        // Room doesn't exist, create it
+        console.log('Room does not exist, creating new room with API key:', API_KEY ? API_KEY.substring(0, 20) + '...' : 'null');
+        console.log('Room name:', roomName);
+        
+        const res = await fetch("https://api.daily.co/v1/rooms", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${API_KEY}`,
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            name: roomName,
+            properties: {
+              exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour expiry
+              enable_recording: "cloud"
+            }
+          })
+        });
+        
+        console.log('Response status:', res.status);
+        console.log('Response headers:', res.headers);
+        
+        const data = await res.json();
+        console.log('Response data:', data);
+        
+        if (!res.ok) {
+          console.error('Room creation failed:', data);
+          // If room already exists, try to use it
+          if (res.status === 400 && data.error && data.error.includes('already exists')) {
+            console.log('Room already exists, using existing room');
+            return `https://${roomName}.daily.co`;
+          }
+          throw new Error(`${data.error || "Failed to create room"} (Status: ${res.status})`);
+        }
+        return data.url;
+      } catch (err) {
+        updateStatus("Room creation failed: " + err.message, true);
+        throw err;
+      }
+    }
+
+    async function connectToRoom() {
+      if (!validateAndShowStatus()) {
+        return;
+      }
+
+      try {
+        // Cleanup any existing connection first
+        if (call) {
+          console.log('Cleaning up existing call object');
+          try {
+            await call.leave();
+          } catch (e) {
+            console.warn('Error leaving previous call:', e);
+          }
+          call = null;
+        }
+
+  // Use provided room name verbatim
+  generatedRoomName = useProvidedRoomName(PRESET_ROOM_NAME);
+        
+        updateStatus("Connecting to room...");
+
+        const ROOM_URL = await createRoom(generatedRoomName);
+        updateStatus("Joining room...");
+
+        call = Daily.createCallObject({
+          audioSource: true,
+          videoSource: false
+        });
+
+        call.on("joined-meeting", (event) => {
+          localUserId = event.participants.local.user_id;
+          updateStatus("✅ Connected - Ready to record");
+          
+          // Show recording controls
+          if (recordingControls) recordingControls.style.display = "block";
+          if (roomInfo) {
+            roomInfo.innerHTML = `<strong>Room:</strong> ${PRESET_ROOM_NAME}<br><strong>Room ID:</strong> ${generatedRoomName}<br><strong>Created:</strong> ${new Date().toLocaleString()}`;
+          }
+
+          verifyMicTrack();
+        });
+
+        call.on("recording-started", (event) => {
+          isRecording = true;
+          currentRecordingId = event.recordingId;
+          updateStatus("🔴 Recording started...");
+          if (startBtn) startBtn.disabled = true;
+          if (stopBtn) stopBtn.disabled = false;
+
+          if (currentRecordingId && recordingLinkDiv) {
+            recordingLinkDiv.innerHTML = `<strong>Recording ID:</strong> ${currentRecordingId}`;
+          }
+        });
+
+        call.on("recording-stopped", () => {
+          isRecording = false;
+          updateStatus("✅ Recording stopped.");
+          if (startBtn) startBtn.disabled = false;
+          if (stopBtn) stopBtn.disabled = true;
+        });
+
+        call.on("recording-error", (e) => {
+          isRecording = false;
+          updateStatus("⚠️ Recording error: " + e.errorMsg, true);
+          if (startBtn) startBtn.disabled = false;
+          if (stopBtn) stopBtn.disabled = true;
+        });
+
+        call.on("track-started", verifyMicTrack);
+        call.on("track-stopped", verifyMicTrack);
+        call.on("audio-device-error", verifyMicTrack);
+        call.on("camera-error", verifyMicTrack);
+
+        call.on("error", (e) => {
+          updateStatus("Connection error: " + e.errorMsg, true);
+        });
+
+        await call.join({ url: ROOM_URL });
+      } catch (err) {
+        console.error(err);
+        updateStatus("Connection failed: " + err.message, true);
+      }
+    }
+
+    function verifyMicTrack() {
+      if (!call) {
+        return;
+      }
+
+      const participants = call.participants ? call.participants() : null;
+      const local = participants ? participants.local : null;
+      const audioTrack = local && local.tracks ? local.tracks.audio : null;
+      const audioState = audioTrack ? audioTrack.state : null;
+      const micPermission = local && local.permissions && local.permissions.canSend
+        ? local.permissions.canSend.audio !== false
+        : true;
+
+      const micEnabled = micPermission && (audioState === "playable" || audioState === "interactive");
+
+      if (!micPermission) {
+        updateStatus("⚠️ Microphone access is blocked or unavailable. Please enable it and refresh the page.", true);
+        if (startBtn) {
+          startBtn.disabled = true;
+          startBtn.textContent = "Enable microphone to record";
+        }
+        return;
+      }
+
+      if (!micEnabled) {
+        updateStatus("🎙️ Waiting for microphone input…", false);
+        if (startBtn) {
+          startBtn.disabled = true;
+          startBtn.textContent = "Waiting for microphone";
+        }
+      } else if (!isRecording && startBtn) {
+        startBtn.disabled = false;
+        startBtn.textContent = "Start Recording";
+        const currentStatus = statusDiv ? statusDiv.innerText : "";
+        if (!currentStatus.includes("⚠️")) {
+          updateStatus("✅ Connected - Ready to record");
+        }
+      }
+    }
+
+    async function startRecording() {
+      console.log('startRecording called - call:', call, 'isRecording:', isRecording);
+      
+      if (!call || isRecording) {
+        updateStatus("Cannot start: already recording or not ready", true);
+        return;
+      }
+
+      verifyMicTrack();
+      if (startBtn && startBtn.disabled) {
+        // verifyMicTrack flagged that we cannot record
+        return;
+      }
+
+      try {
+        updateStatus("Starting recording...");
+        await call.startRecording({
+          layout: {
+            preset: "audio-only",
+            participants: {
+              audio: [localUserId]
+            }
+          }
+        });
+      } catch (err) {
+        updateStatus("Start failed: " + err.message, true);
+      }
+    }
+
+  async function stopRecording() {
+      if (!call || !isRecording) {
+        updateStatus("Cannot stop: Not recording", true);
+        return;
+      }
+
+      try {
+        updateStatus("Stopping recording...");
+        await call.stopRecording();
+      } catch (err) {
+        updateStatus("Stop failed: " + err.message, true);
+      }
+    }
+
+    // Auto-connect when page loads
+    window.addEventListener("load", () => {
+      console.log('Page loaded, connecting to room');
+      // Wait a bit for DOM elements to be ready
+      setTimeout(() => {
+        if (validateAndShowStatus()) {
+          connectToRoom();
+        }
+      }, 100);
+    });
+
+    // Handle page visibility changes (when user switches tabs or navigates back)
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === 'visible') {
+        console.log('Page became visible');
+        // Reconnect if we don't have an active connection
+        if (!call && validateAndShowStatus()) {
+          console.log('Reconnecting to room');
+          connectToRoom();
+        }
+      }
+    });
+
+    // Cleanup on page unload
+    window.addEventListener("beforeunload", () => {
+      if (call) call.leave();
+    });
+  </script>
+</body>
+</html>
