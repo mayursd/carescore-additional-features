@@ -11,6 +11,50 @@ import tempfile
 import os
 from src.utils.audio_video_utils import AudioVideoToNoteGenerator
 
+
+def _iter_table_text(table):
+    chunks = []
+    for row in table.rows:
+        for cell in row.cells:
+            cell_parts = []
+            for para in cell.paragraphs:
+                text = (para.text or "").strip()
+                if text:
+                    cell_parts.append(text)
+            for nested_table in cell.tables:
+                nested_text = _iter_table_text(nested_table)
+                if nested_text:
+                    cell_parts.append(nested_text)
+            cell_text = "\n".join(cell_parts).strip()
+            if cell_text:
+                chunks.append(cell_text)
+    return "\n".join(chunks).strip()
+
+
+def _extract_docx_text(doc):
+    parts = []
+
+    for para in doc.paragraphs:
+        text = (para.text or "").strip()
+        if text:
+            parts.append(text)
+
+    for table in doc.tables:
+        table_text = _iter_table_text(table)
+        if table_text:
+            parts.append(table_text)
+
+    # Keep order stable while dropping exact duplicates from templates.
+    deduped = []
+    seen = set()
+    for part in parts:
+        if part not in seen:
+            seen.add(part)
+            deduped.append(part)
+
+    return "\n\n".join(deduped).strip()
+
+
 def get_file_content(uploaded_file):
     try:
         if uploaded_file is not None:
@@ -66,7 +110,7 @@ def get_file_content(uploaded_file):
             elif uploaded_file.type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
                 try:
                     doc = Document(uploaded_file)
-                    file_content = "\n".join([para.text for para in doc.paragraphs])
+                    file_content = _extract_docx_text(doc)
                 except Exception as e:
                     st.error(f"Error processing Word document: {str(e)}")
                     return None
