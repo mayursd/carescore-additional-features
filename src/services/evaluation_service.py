@@ -103,6 +103,16 @@ def _normalize_grade_item(item: Any) -> dict[str, Any]:
     }
 
 
+def _coerce_score(value: Any) -> float | None:
+    try:
+        text = str(value).strip()
+        if not text:
+            return None
+        return float(text)
+    except (TypeError, ValueError):
+        return None
+
+
 def _normalize_grade_payload(payload: Any) -> dict[str, Any]:
     if not isinstance(payload, dict):
         return {}
@@ -117,13 +127,17 @@ def _normalize_grade_payload(payload: Any) -> dict[str, Any]:
     achieved_score = payload.get("achieved_score")
     if achieved_score in (None, ""):
         achieved_score = payload.get("Achieved CareScore")
+    scored_criteria = [
+        item for item in normalized_criteria
+        if (_coerce_score(item.get("Achieved CareScore")) or 0) > 0
+    ]
+    matched_criterion = scored_criteria[0] if len(scored_criteria) == 1 else {}
+    if achieved_score in (None, ""):
+        achieved_score = matched_criterion.get("Achieved CareScore")
     if achieved_score in (None, ""):
         achieved_score = top_criterion.get("Achieved CareScore", 0)
 
-    try:
-        achieved_score_num = float(achieved_score)
-    except (TypeError, ValueError):
-        achieved_score_num = None
+    achieved_score_num = _coerce_score(achieved_score)
 
     selected_assessment = payload.get("assessment") or ""
     if not selected_assessment and achieved_score_num is not None and normalized_criteria:
@@ -152,14 +166,31 @@ def _normalize_grade_payload(payload: Any) -> dict[str, Any]:
                 except ValueError:
                     continue
 
+    if not matched_criterion and selected_assessment:
+        for item in normalized_criteria:
+            if str(item.get("Assessment", "")).strip().lower() == selected_assessment.strip().lower():
+                matched_criterion = item
+                break
+
+    matched_score = _coerce_score((matched_criterion or {}).get("Achieved CareScore"))
+    if matched_score is not None and (achieved_score_num is None or achieved_score_num <= 0):
+        achieved_score = matched_criterion.get("Achieved CareScore")
+        achieved_score_num = matched_score
+
     if not selected_assessment:
         selected_assessment = top_criterion.get("Assessment", "")
+
+    total_possible_score = payload.get("total_possible_score") or payload.get("Total CareScore") or ""
+    if not total_possible_score and matched_criterion:
+        total_possible_score = matched_criterion.get("Possible CareScore", "")
+    if not total_possible_score:
+        total_possible_score = top_criterion.get("Possible CareScore", "")
 
     return {
         "criteria": normalized_criteria,
         "assessment": selected_assessment,
         "achieved_score": achieved_score,
-        "total_possible_score": payload.get("total_possible_score") or payload.get("Total CareScore") or top_criterion.get("Possible CareScore", ""),
+        "total_possible_score": total_possible_score,
         "evaluation_summary": payload.get("evaluation_summary") or "",
         "detailed_llm_reasoning": payload.get("detailed_llm_reasoning") or "",
     }
