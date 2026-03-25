@@ -37,6 +37,14 @@ class SessionState:
             st.session_state.case_title = ""
         if "auto_checklist" not in st.session_state:
             st.session_state.auto_checklist = []
+        if "transcript_checklist" not in st.session_state:
+            st.session_state.transcript_checklist = []
+        if "manual_checklist" not in st.session_state:
+            st.session_state.manual_checklist = []
+        if "checklist_source" not in st.session_state:
+            st.session_state.checklist_source = "transcript"
+        if "checklist_mode_preference" not in st.session_state:
+            st.session_state.checklist_mode_preference = "Auto from Transcript"
         if "student_grade" not in st.session_state:
             st.session_state.student_grade = {}
         if "final_soap_text" not in st.session_state:
@@ -76,6 +84,8 @@ class StreamlinedWorkflowPage(Page):
             'downloading_recording': False,
             'current_recording': None,
             'auto_checklist': [],
+            'transcript_checklist': [],
+            'manual_checklist': [],
             'student_grade': {},
             'final_soap_text': '',
         }
@@ -325,7 +335,11 @@ class StreamlinedWorkflowPage(Page):
         tab_labels = ["📄 SOAP Note", "📝 Transcript"]
         tab_renderers = [self.soap_display.render, self.transcript_display.render]
 
-        if st.session_state.get("auto_checklist"):
+        if (
+            st.session_state.get("auto_checklist")
+            or st.session_state.get("transcript_checklist")
+            or st.session_state.get("manual_checklist")
+        ):
             tab_labels.append("📋 Checklist")
             tab_renderers.append(self.checklist_display.render)
 
@@ -364,7 +378,7 @@ class StreamlinedWorkflowPage(Page):
         with col2:
             if st.button("🔄 Reprocess Audio", use_container_width=True):
                 # Clear prior outputs & flags then auto-run again on audio_input screen
-                for k in ['soap_data','transcript','processing_started','processing_inflight','processing_complete','interview_content','transcription_result','soap_result','auto_checklist','student_grade','case_file','case_file_content','case_file_signature','case_title','final_soap_text','final_soap_signature','final_soap_name','final_soap_upload']:
+                for k in ['soap_data','transcript','processing_started','processing_inflight','processing_complete','interview_content','transcription_result','soap_result','auto_checklist','transcript_checklist','manual_checklist','checklist_source','checklist_mode_preference','student_grade','case_file','case_file_content','case_file_signature','case_title','final_soap_text','final_soap_signature','final_soap_name','final_soap_upload']:
                     if k in st.session_state:
                         del st.session_state[k]
                 st.session_state.workflow_stage = 'audio_input'
@@ -377,7 +391,7 @@ class StreamlinedWorkflowPage(Page):
                     'interview_file', 'processing_started', 'processing_inflight', 'processing_complete',
                     'downloading_recording', 'current_recording', 'soap_data', 'transcript',
                     'interview_content', 'transcription_result', 'soap_result',
-                    'auto_checklist', 'student_grade', 'case_file', 'case_file_content',
+                    'auto_checklist', 'transcript_checklist', 'manual_checklist', 'checklist_source', 'checklist_mode_preference', 'student_grade', 'case_file', 'case_file_content',
                     'case_file_signature', 'case_title', 'final_soap_text',
                     'final_soap_signature', 'final_soap_name', 'final_soap_upload'
                 ]:
@@ -391,7 +405,7 @@ class StreamlinedWorkflowPage(Page):
     def _on_file_upload_analysis(self):
         """Handle file upload analysis start: jump straight to processing and run pipeline."""
         # Ensure a clean processing state
-        for k in ['processing_started', 'processing_inflight', 'processing_complete', 'soap_data', 'transcript', 'auto_checklist', 'student_grade', 'case_file', 'case_file_content', 'case_file_signature', 'case_title', 'final_soap_text', 'final_soap_signature', 'final_soap_name', 'final_soap_upload']:
+        for k in ['processing_started', 'processing_inflight', 'processing_complete', 'soap_data', 'transcript', 'auto_checklist', 'transcript_checklist', 'manual_checklist', 'checklist_source', 'checklist_mode_preference', 'student_grade', 'case_file', 'case_file_content', 'case_file_signature', 'case_title', 'final_soap_text', 'final_soap_signature', 'final_soap_name', 'final_soap_upload']:
             if k in st.session_state:
                 del st.session_state[k]
         # Start processing immediately
@@ -415,7 +429,7 @@ class StreamlinedWorkflowPage(Page):
             'selected_prompt', 'show_live_recorder', 'file_processed',
             'case_file', 'case_file_content', 'case_file_signature', 'case_title',
             'interview_content', 'transcription_result', 'soap_result',
-            'auto_checklist', 'student_grade', 'final_soap_text',
+            'auto_checklist', 'transcript_checklist', 'manual_checklist', 'checklist_source', 'checklist_mode_preference', 'student_grade', 'final_soap_text',
             'final_soap_signature', 'final_soap_name', 'final_soap_upload'
         ]
         for key in keys_to_clear:
@@ -477,7 +491,7 @@ class Navigation:
                     'selected_prompt', 'show_live_recorder', 'file_processed',
                     'case_file', 'case_file_content', 'case_file_signature', 'case_title',
                     'interview_content', 'transcription_result', 'soap_result',
-                    'auto_checklist', 'student_grade', 'final_soap_text',
+                    'auto_checklist', 'transcript_checklist', 'manual_checklist', 'checklist_source', 'checklist_mode_preference', 'student_grade', 'final_soap_text',
                     'final_soap_signature', 'final_soap_name', 'final_soap_upload'
                 ]
                 for key in keys_to_clear:

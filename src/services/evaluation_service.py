@@ -5,6 +5,8 @@ from typing import Any
 import streamlit as st
 
 from src.config.prompts import (
+    CHECKLIST_EVALUATION_PROMPT,
+    CHECKLIST_RETRIEVAL_PROMPT,
     CHECKLIST_SAMPLE_JSON,
     EVALUATION_CRITERIA,
     PROMPT as SOAP_GRADING_PROMPT,
@@ -261,7 +263,67 @@ def generate_checklist(transcript: str) -> list[dict[str, str]]:
         return []
 
 
-def generate_checklist_artifact(transcript: str) -> list[dict[str, str]]:
+def generate_case_file_checklist(case_file_content: str, transcript: str = "") -> list[dict[str, str]]:
+    if not (case_file_content or "").strip():
+        return []
+
+    extraction_prompt = "\n\n".join([
+        "You are a clinician extracting an evaluation checklist from a patient case file.",
+        CHECKLIST_RETRIEVAL_PROMPT,
+        "Case File:\n" + case_file_content,
+        "Checklist JSON sample:\n" + CHECKLIST_SAMPLE_JSON,
+    ])
+
+    extraction_response = llm_call(
+        model=st.session_state.get("gemini_model", "gemini-3-pro-preview"),
+        messages=[
+            {"role": "system", "content": "Extract the complete checklist from the case file."},
+            {"role": "user", "content": extraction_prompt},
+        ],
+        format="json",
+    )
+    if not extraction_response:
+        return []
+
+    try:
+        extracted_payload = _json_response_to_obj(extraction_response)
+        extracted_items = _normalize_checklist_payload(extracted_payload)
+    except Exception as exc:
+        st.warning(f"Checklist extraction failed: {exc}")
+        return []
+
+    if not extracted_items or not (transcript or "").strip():
+        return extracted_items
+
+    evaluation_prompt = "\n\n".join([
+        "You are a clinician evaluating a case-file checklist against an encounter transcript.",
+        CHECKLIST_EVALUATION_PROMPT,
+        "Transcript:\n" + transcript,
+        "CheckList Evaluation:\n" + json.dumps(extracted_items, indent=2),
+    ])
+
+    evaluation_response = llm_call(
+        model=st.session_state.get("gemini_model", "gemini-3-pro-preview"),
+        messages=[
+            {"role": "system", "content": "Evaluate the extracted checklist against the transcript."},
+            {"role": "user", "content": evaluation_prompt},
+        ],
+        format="json",
+    )
+    if not evaluation_response:
+        return extracted_items
+
+    try:
+        evaluated_payload = _json_response_to_obj(evaluation_response)
+        return _normalize_checklist_payload(evaluated_payload)
+    except Exception as exc:
+        st.warning(f"Checklist evaluation failed: {exc}")
+        return extracted_items
+
+
+def generate_checklist_artifact(transcript: str, case_file_content: str = "", mode: str = "transcript") -> list[dict[str, str]]:
+    if mode == "manual_case_file":
+        return generate_case_file_checklist(case_file_content, transcript)
     return generate_checklist(transcript)
 
 

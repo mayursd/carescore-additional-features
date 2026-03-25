@@ -80,6 +80,10 @@ class ProcessingPipeline:
             'interview_content',
             'transcription_result',
             'auto_checklist',
+            'transcript_checklist',
+            'manual_checklist',
+            'checklist_source',
+            'checklist_mode_preference',
             'student_grade',
             'case_file',
             'case_file_content',
@@ -144,13 +148,18 @@ class ProcessingPipeline:
             status_text.text(f"📋 Step {current_step}/{total_steps}: Running checklist...")
             progress_bar.progress(int((current_step / total_steps) * 100))
             try:
-                st.session_state.auto_checklist = generate_checklist_artifact(
+                generated_checklist = generate_checklist_artifact(
                     st.session_state.get("transcript", ""),
                 )
+                st.session_state.transcript_checklist = generated_checklist
+                st.session_state.auto_checklist = generated_checklist
+                st.session_state.checklist_source = "transcript"
+                st.session_state.checklist_mode_preference = "Auto from Transcript"
             except Exception as exc:
                 logger.warning("[Processing] Checklist generation failed: %s", exc)
                 st.warning(f"Checklist generation failed: {exc}")
                 st.session_state.auto_checklist = []
+                st.session_state.transcript_checklist = []
 
             # Final step: Complete
             status_text.text(f"✅ Step {total_steps}/{total_steps}: Analysis complete!")

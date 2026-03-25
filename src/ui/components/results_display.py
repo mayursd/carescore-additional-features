@@ -434,7 +434,11 @@ class ResultsSummary:
         # Check what results we have
         has_soap = bool(st.session_state.get("soap_data"))
         has_transcript = bool(st.session_state.get("transcript"))
-        has_checklist = bool(st.session_state.get("auto_checklist"))
+        has_checklist = bool(
+            st.session_state.get("auto_checklist")
+            or st.session_state.get("transcript_checklist")
+            or st.session_state.get("manual_checklist")
+        )
         has_grade = bool(st.session_state.get("student_grade"))
 
         columns = st.columns(4)
